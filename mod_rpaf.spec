@@ -7,8 +7,8 @@ Summary:        mod_rpaf
 Group:          System Environment/Daemons
 License:        Apache Software License
 URL:            http://stderr.net/apache/rpaf/download/
-Source0:        http://stderr.net/apache/rpaf/download/mod_rpaf-%{version}.tar.gz
-Source1:	    rpaf.conf
+Source0:        https://github.com/y-ken/mod_rpaf/raw/master/rpmbuild/SOURCES/mod_rpaf-%{version}.tar.gz
+Source1:        rpaf.conf
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 BuildRequires:  httpd-devel >= 2.0.38
@@ -18,7 +18,7 @@ Requires:       httpd
 rpaf is for backend Apache servers what mod_proxy_add_forward is for
 frontend Apache servers. It does excactly the opposite of
 mod_proxy_add_forward written by Ask Bjørn Hansen. It will also work
-with mod_proxy that is distributed with Apache2 from version 2.0.36.
+with mod_proxy that is distributed with Apache2 from version 2.0.38.
 
 %prep
 %setup -q -n mod_rpaf-%{version} 
