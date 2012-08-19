@@ -266,42 +266,42 @@ static int change_remote_ip(request_rec *r) {
 
 static const command_rec rpaf_cmds[] = {
     AP_INIT_FLAG(
-                 "RPAF_Enable",
+                 "RPAFenable",
                  rpaf_enable,
                  NULL,
                  RSRC_CONF,
                  "Enable mod_rpaf"
                  ),
     AP_INIT_FLAG(
-                 "RPAF_SetHostName",
+                 "RPAFsethostname",
                  rpaf_sethostname,
                  NULL,
                  RSRC_CONF,
                  "Let mod_rpaf set the hostname from the X-Forwarded-Host or X-Host header and update vhosts"
                  ),
     AP_INIT_FLAG(
-                 "RPAF_SetHTTPS",
+                 "RPAFsethttps",
                  rpaf_sethttps,
                  NULL,
                  RSRC_CONF,
                  "Let mod_rpaf set the HTTPS environment variable from the X-HTTPS or X-Forwarded-HTTPS or X-Forwarded-Proto header"
                  ),
     AP_INIT_FLAG(
-                 "RPAF_SetPort",
+                 "RPAFsetport",
                  rpaf_setport,
                  NULL,
                  RSRC_CONF,
                  "Let mod_rpaf set the server port from the X-Port header"
                  ),
     AP_INIT_ITERATE(
-                 "RPAF_ProxyIPs",
+                 "RPAFproxy_ips",
                  rpaf_set_proxy_ip,
                  NULL,
                  RSRC_CONF,
                  "IP(s) of Proxy server setting X-Forwarded-For header"
                  ),
     AP_INIT_TAKE1(
-                 "RPAF_Header",
+                 "RPAFheader",
                  rpaf_set_headername,
                  NULL,
                  RSRC_CONF,
