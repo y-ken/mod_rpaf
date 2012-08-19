@@ -4,14 +4,14 @@
 
 Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstream proxy.
 
-### What's updated from original mod_rpaf-0.6.
+### What's difference from original mod_rpaf-0.6.
 
-* Feature: Support for partial IP address as '10.1.' for RPAFproxy_ips. The author of this patch is unknown.
-* Feature: support for passing CIDRs in RPAF_ProxyIPs.
-* Feature: support for passing CIDRs in RPAF_ProxyIPs.
+* Feature: Add directive RPAF_SetHTTPS.
+* Feature: Add directive RPAF_SetPort.
+* Feature: Support for partial IP address as '10.1.' for RPAFproxy_ips.
+* Feature: Support for rewrite for passing CIDRs in RPAF_ProxyIPs.
 * Bugfix: In the case of APR_HAVE_IPV6-enabled build, access control of Order/Allow/Deny does not work correctly.
 * Support of httpd 1.3 was deleted.
-* 
 
 ### Compile Debian/Ubuntu Package and Install
 
@@ -31,15 +31,15 @@ Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstre
 
     RPAF_ProxyIPs    127.0.0.1 10.0.0.1 - What IPs to adjust requests for
 
-    RPAF_Header      X-Forwarded-For    - The header to use for the real IP
-                                          address.
+    RPAF_Header      X-Forwarded-For    - The header to use for the real IP address.
 
-    RPAF_SetHostName (On|Off)           - Update vhost name so ServerName &
+    RPAF_SetHostName (On|Off)           - Update vhost name so ServerName & 
                                           ServerAlias work
 
     RPAF_SetHTTPS    (On|Off)           - Set the HTTPS environment variable
                                           to the header value contained in
                                           X-HTTPS, or X-Forwarded-HTTPS.
+                                          Also work X-Forwarded-Proto is https.
 
     RPAF_SetPort     (On|Off)           - Set the server port to the header
                                           value contained in X-Port, or
