@@ -27,11 +27,11 @@ Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstre
 
 ### Install with rpm for RedHat/CentOS 5.x
 
-    rpm -ivh https://github.com/y-ken/mod_rpaf/raw/master/rpm/centos5/mod_rpaf-0.6-1.x86_64.rpm
+    rpm -ivh https://github.com/y-ken/mod_rpaf/raw/master/rpm/centos5/mod_rpaf-0.6-2.x86_64.rpm
 
 ### Install with rpm for RedHat/CentOS 6.x
 
-    rpm -ivh https://github.com/y-ken/mod_rpaf/raw/master/rpm/centos6/mod_rpaf-0.6-1.el6.x86_64.rpm
+    rpm -ivh https://github.com/y-ken/mod_rpaf/raw/master/rpm/centos6/mod_rpaf-0.6-2.el6.x86_64.rpm
 
 ### Configuration Directives
 
