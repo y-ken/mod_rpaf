@@ -71,6 +71,7 @@
 #include "http_protocol.h"
 #include "http_vhost.h"
 #include "apr_strings.h"
+#include "arpa/inet.h"
 
 module AP_MODULE_DECLARE_DATA rpaf_module;
 
@@ -83,6 +84,7 @@ typedef struct {
 
 typedef struct {
     const char  *old_ip;
+    int         old_family;
     request_rec *r;
 } rpaf_cleanup_rec;
 
@@ -139,7 +141,7 @@ static int is_in_array(const char *remote_ip, apr_array_header_t *proxy_ips) {
     int i;
     char **list = (char**)proxy_ips->elts;
     for (i = 0; i < proxy_ips->nelts; i++) {
-        if (strcmp(remote_ip, list[i]) == 0)
+        if (strncmp(remote_ip, list[i], strlen(list[i])) == 0)
             return 1;
     }
     return 0;
@@ -149,6 +151,7 @@ static apr_status_t rpaf_cleanup(void *data) {
     rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)data;
     rcr->r->connection->remote_ip   = apr_pstrdup(rcr->r->connection->pool, rcr->old_ip);
     rcr->r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(rcr->r->connection->remote_ip);
+    rcr->r->connection->remote_addr->sa.sin.sin_family = rcr->old_family;
     return APR_SUCCESS;
 }
 
@@ -181,10 +184,12 @@ static int change_remote_ip(request_rec *r) {
                     ++fwdvalue;
             }
             rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->remote_ip);
+            rcr->old_family = r->connection->remote_addr->sa.sin.sin_family;
             rcr->r = r;
             apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
             r->connection->remote_ip = apr_pstrdup(r->connection->pool, ((char **)arr->elts)[((arr->nelts)-1)]);
             r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(r->connection->remote_ip);
+            r->connection->remote_addr->sa.sin.sin_family = AF_INET;
             if (cfg->sethostname) {
                 const char *hostvalue;
                 if (hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) {
