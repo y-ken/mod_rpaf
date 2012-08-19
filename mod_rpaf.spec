@@ -6,8 +6,8 @@ Summary:        mod_rpaf
 
 Group:          System Environment/Daemons
 License:        Apache Software License
-URL:            http://stderr.net/apache/rpaf/download/
-Source0:        https://github.com/y-ken/mod_rpaf/raw/master/rpmbuild/SOURCES/mod_rpaf-%{version}.tar.gz
+URL:            https://github.com/y-ken/mod_rpaf
+Source0:        mod_rpaf-%{version}.tar.gz
 Source1:        rpaf.conf
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 

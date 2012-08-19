@@ -4,7 +4,7 @@
 
 Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstream proxy.
 
-### What's difference from original mod_rpaf-0.6.
+### What is the difference from original mod_rpaf-0.6.
 
 * Feature: Add directive RPAF_SetHTTPS.
 * Feature: Add directive RPAF_SetPort.
@@ -24,6 +24,14 @@ Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstre
     yum install httpd-devel
     make
     make install
+
+### Install with rpm for RedHat/CentOS 5.x
+
+    rpm -ivh https://github.com/y-ken/mod_rpaf/raw/master/rpm/centos5/mod_rpaf-0.6-1.x86_64.rpm
+
+### Install with rpm for RedHat/CentOS 6.x
+
+    rpm -ivh https://github.com/y-ken/mod_rpaf/raw/master/rpm/centos6/mod_rpaf-0.6-1.el6.x86_64.rpm
 
 ### Configuration Directives
 
@@ -49,7 +57,7 @@ Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstre
 
     LoadModule        rpaf_module modules/mod_rpaf-2.0.so
     RPAF_Enable       On
-    RPAF_ProxyIPs     127.0.0.1 10.0.0.10 10.0.0.20
+    RPAF_ProxyIPs     127.0.0.1 10.0.0.1/28
     RPAF_Header       X-Forwarded-For
     RPAF_SetHostName  On
     RPAF_SetHTTPS     On
@@ -69,6 +77,6 @@ latest version is available [from GitHub](http://github.com/y-ken/mod_rpaf)
 
 ## Footnote
 
-It's merged following project.
+It is based on following project.
 * https://github.com/ttkzw/mod_rpaf-0.6
 * https://github.com/gnif/mod_rpaf
