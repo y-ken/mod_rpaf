@@ -5,7 +5,7 @@ Release: 1
 License: Apache
 Group: System Environment/Daemons
 URL: https://github.com/gnif/mod_rpaf
-Source0: http://stderr.net/apache/rpaf/download/%{name}-%{version}.tar.gz
+Source0: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 BuildRequires: httpd-devel
 Requires: httpd httpd-devel
@@ -14,8 +14,7 @@ Requires: httpd httpd-devel
 rpaf is for backend Apache servers what mod_proxy_add_forward is for
 frontend Apache servers. It does excactly the opposite of
 mod_proxy_add_forward written by Ask Bjørn Hansen. It will also work
-with mod_proxy in Apache starting with release 1.3.25 and mod_proxy
-that is distributed with Apache2 from version 2.0.36.
+with mod_proxy that is distributed with Apache2 from version 2.0.36.
 
 %prep
 %setup -q
@@ -45,7 +44,7 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
-* Mon Oct 17 2011 Ben Walton <bwalton@artsci.utoronto.ca>
-- Initial spec file creation
 * Sun Aug 19 2012 Kentaro Yoshida <y.ken.studio@gmail.com>
 - improbe forward compatibility
+* Mon Oct 17 2011 Ben Walton <bwalton@artsci.utoronto.ca>
+- Initial spec file creation
