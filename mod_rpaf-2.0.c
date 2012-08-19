@@ -1,68 +1,19 @@
 
-/* ====================================================================
- * Copyright (c) 1995 The Apache Group.  All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- *
- * 3. All advertising materials mentioning features or use of this
- *    software must display the following acknowledgment:
- *    "This product includes software developed by the Apache Group
- *    for use in the Apache HTTP server project (http://www.apache.org/)."
- *
- * 4. The names "Apache Server" and "Apache Group" must not be used to
- *    endorse or promote products derived from this software without
- *    prior written permission.
- *
- * 5. Redistributions of any form whatsoever must retain the following
- *    acknowledgment:
- *    "This product includes software developed by the Apache Group
- *    for use in the Apache HTTP server project (http://www.apache.org/)."
- *
- * THIS SOFTWARE IS PROVIDED BY THE APACHE GROUP ``AS IS'' AND ANY
- * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE APACHE GROUP OR
- * IT'S CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGE.
- * ====================================================================
- *
- * This software consists of voluntary contributions made by many
- * individuals on behalf of the Apache Group and was originally based
- * on public domain software written at the National Center for
- * Supercomputing Applications, University of Illinois, Urbana-Champaign.
- * For more information on the Apache Group and the Apache HTTP server
- * project, please see <http://www.apache.org/>.
- *
- */
-
 /*
- * $Id: mod_rpaf-2.0.c 18 2008-01-01 03:05:40Z thomas $
- *
- * Author: Thomas Eibner, <thomas@stderr.net>
- * URL: http://stderr.net/apache/rpaf/
- * rpaf is short for reverse proxy add forward 
- *
- * This module does the opposite of mod_proxy_add_forward written by
- * Ask Bjørn Hansen. http://develooper.com/code/mpaf/ or mod_proxy
- * in 1.3.25 and above and mod_proxy from Apache 2.0
- * 
- */ 
+   Copyright 2012 Kentaro YOSHIDA
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 
 #include "httpd.h"
 #include "http_config.h"
@@ -78,8 +29,13 @@ module AP_MODULE_DECLARE_DATA rpaf_module;
 typedef struct {
     int                enable;
     int                sethostname;
+    int                sethttps;
+    int                setport;
     const char         *headername;
     apr_array_header_t *proxy_ips;
+    const char         *orig_scheme;
+    const char         *https_scheme;
+    int                orig_port;
 } rpaf_server_cfg;
 
 typedef struct {
@@ -96,6 +52,10 @@ static void *rpaf_create_server_cfg(apr_pool_t *p, server_rec *s) {
     cfg->proxy_ips = apr_array_make(p, 0, sizeof(char *));
     cfg->enable = 0;
     cfg->sethostname = 0;
+
+    cfg->orig_scheme  = s->server_scheme;
+    cfg->https_scheme = apr_pstrdup(p, "https");
+    cfg->orig_port    = s->port;
 
     return (void *)cfg;
 }
@@ -137,22 +97,90 @@ static const char *rpaf_sethostname(cmd_parms *cmd, void *dummy, int flag) {
     return NULL;
 }
 
-static int is_in_array(const char *remote_ip, apr_array_header_t *proxy_ips) {
+static const char *rpaf_sethttps(cmd_parms *cmd, void *dummy, int flag) {
+    server_rec *s = cmd->server;
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
+                                                                   &rpaf_module);
+
+    cfg->sethttps = flag;
+    return NULL;
+}
+
+static const char *rpaf_setport(cmd_parms *cmd, void *dummy, int flag) {
+    server_rec *s = cmd->server;
+    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
+                                                                   &rpaf_module);
+
+    cfg->setport = flag;
+    return NULL;
+}
+
+static int check_cidr(apr_pool_t *pool, const char *ipcidr, const char *testip) {
+    char *ip;
+    int cidr_val;
+    unsigned int netmask;
+    char *cidr;
+    /* TODO: this might not be portable.  just use struct in_addr instead? */
+    uint32_t ipval, testipval;
+
+    /* TODO: this iterates once to copy and iterates again to tokenize */
+    ip = apr_pstrdup(pool, ipcidr);
+    cidr = ip;
+    while (*cidr != '\0') {
+        if (*cidr == '/') {
+            *(cidr++) = '\0';
+            break;
+        }
+        cidr++;
+    }
+
+    if (cidr == NULL) {
+        return -1;
+    }
+
+    cidr_val = atoi(cidr);
+    if (cidr_val < 1 || cidr_val > 32) {
+        return -1;
+    }
+
+    netmask = 0xffffffff << (32 - cidr_val);
+    ipval = ntohl(inet_addr(ip));
+    testipval = ntohl(inet_addr(testip));
+
+    return (ipval & netmask) == (testipval & netmask);
+}
+
+static int is_in_array(apr_pool_t *pool, const char *remote_ip, apr_array_header_t *proxy_ips) {
     int i;
     char **list = (char**)proxy_ips->elts;
     for (i = 0; i < proxy_ips->nelts; i++) {
-        if (strncmp(remote_ip, list[i], strlen(list[i])) == 0)
+        if (check_cidr(pool, list[i], remote_ip) == 1) {
             return 1;
+        }
+        if (strncmp(remote_ip, list[i], strlen(list[i])) == 0) {
+            return 1;
+        }
     }
     return 0;
 }
 
 static apr_status_t rpaf_cleanup(void *data) {
     rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)data;
-    rcr->r->connection->remote_ip   = apr_pstrdup(rcr->r->connection->pool, rcr->old_ip);
+    rcr->r->connection->remote_ip = apr_pstrdup(rcr->r->connection->pool, rcr->old_ip);
     rcr->r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(rcr->r->connection->remote_ip);
     rcr->r->connection->remote_addr->sa.sin.sin_family = rcr->old_family;
     return APR_SUCCESS;
+}
+
+static char* last_not_in_array(apr_pool_t *pool,
+                               apr_array_header_t *forwarded_for,
+                               apr_array_header_t *proxy_ips) {
+    int i;
+    for (i = (forwarded_for->nelts)-1; i > 0; i--) {
+        if (!is_in_array(pool, ((char **)forwarded_for->elts)[i], proxy_ips))
+           break;
+    }
+    return ((char **)forwarded_for->elts)[i];
 }
 
 static int change_remote_ip(request_rec *r) {
@@ -164,12 +192,12 @@ static int change_remote_ip(request_rec *r) {
     if (!cfg->enable)
         return DECLINED;
 
-    if (is_in_array(r->connection->remote_ip, cfg->proxy_ips) == 1) {
+    if (is_in_array(r->pool, r->connection->remote_ip, cfg->proxy_ips) == 1) {
         /* check if cfg->headername is set and if it is use
            that instead of X-Forwarded-For by default */
         if (cfg->headername && (fwdvalue = apr_table_get(r->headers_in, cfg->headername))) {
             //
-        } else if (fwdvalue = apr_table_get(r->headers_in, "X-Forwarded-For")) {
+        } else if ((fwdvalue = apr_table_get(r->headers_in, "X-Forwarded-For"))) {
             //
         } else {
             return DECLINED;
@@ -187,24 +215,50 @@ static int change_remote_ip(request_rec *r) {
             rcr->old_family = r->connection->remote_addr->sa.sin.sin_family;
             rcr->r = r;
             apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
-            r->connection->remote_ip = apr_pstrdup(r->connection->pool, ((char **)arr->elts)[((arr->nelts)-1)]);
+            r->connection->remote_ip = apr_pstrdup(r->connection->pool, last_not_in_array(r->pool, arr, cfg->proxy_ips));
             r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(r->connection->remote_ip);
             r->connection->remote_addr->sa.sin.sin_family = AF_INET;
             if (cfg->sethostname) {
                 const char *hostvalue;
-                if (hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) {
-                    /* 2.0 proxy frontend or 1.3 => 1.3.25 proxy frontend */
-                    apr_table_set(r->headers_in, "Host", apr_pstrdup(r->pool, hostvalue));
-                    r->hostname = apr_pstrdup(r->pool, hostvalue);
-                    ap_update_vhost_from_headers(r);
-                } else if (hostvalue = apr_table_get(r->headers_in, "X-Host")) {
-                    /* 1.3 proxy frontend with mod_proxy_add_forward */
-                    apr_table_set(r->headers_in, "Host", apr_pstrdup(r->pool, hostvalue));
-                    r->hostname = apr_pstrdup(r->pool, hostvalue);
+                if ((hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) ||
+                    (hostvalue = apr_table_get(r->headers_in, "X-Host"))) {
+                    apr_array_header_t *arr = apr_array_make(r->pool, 0, sizeof(char*));
+                    while (*hostvalue && (val = ap_get_token(r->pool, &hostvalue, 1))) {
+                        *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, val);
+                        if (*hostvalue != '\0')
+                          ++hostvalue;
+                    }
+
+                    apr_table_set(r->headers_in, "Host", apr_pstrdup(r->pool, ((char **)arr->elts)[((arr->nelts)-1)]));
+                    r->hostname = apr_pstrdup(r->pool, ((char **)arr->elts)[((arr->nelts)-1)]);
                     ap_update_vhost_from_headers(r);
                 }
             }
+            
+            if (cfg->sethttps) {
+                const char *httpsvalue;
+                if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-HTTPS")) ||
+                    (httpsvalue = apr_table_get(r->headers_in, "X-HTTPS"))) {
+                    apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, httpsvalue));
+                    r->server->server_scheme = cfg->https_scheme;
+                } else if (strcmp("https", apr_table_get(r->headers_in, "X-Forwarded-Proto"))) {
+                    apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, "On"));
+                    r->server->server_scheme = cfg->https_scheme;
+                } else {
+                    r->server->server_scheme = cfg->orig_scheme;
+                }
+            }
 
+            if (cfg->setport) {
+                const char *portvalue;
+                if ((portvalue = apr_table_get(r->headers_in, "X-Forwarded-Port")) ||
+                    (portvalue = apr_table_get(r->headers_in, "X-Port"))) {
+                    r->server->port    = atoi(portvalue);
+                    r->parsed_uri.port = r->server->port;
+                } else {
+                    r->server->port = cfg->orig_port;
+                }
+            }
         }
     }
     return DECLINED;
@@ -212,33 +266,47 @@ static int change_remote_ip(request_rec *r) {
 
 static const command_rec rpaf_cmds[] = {
     AP_INIT_FLAG(
-                 "RPAFenable",
+                 "RPAF_Enable",
                  rpaf_enable,
                  NULL,
                  RSRC_CONF,
                  "Enable mod_rpaf"
                  ),
     AP_INIT_FLAG(
-                 "RPAFsethostname",
+                 "RPAF_SetHostName",
                  rpaf_sethostname,
                  NULL,
                  RSRC_CONF,
-                 "Let mod_rpaf set the hostname from X-Host header and update vhosts"
+                 "Let mod_rpaf set the hostname from the X-Forwarded-Host or X-Host header and update vhosts"
+                 ),
+    AP_INIT_FLAG(
+                 "RPAF_SetHTTPS",
+                 rpaf_sethttps,
+                 NULL,
+                 RSRC_CONF,
+                 "Let mod_rpaf set the HTTPS environment variable from the X-HTTPS or X-Forwarded-HTTPS or X-Forwarded-Proto header"
+                 ),
+    AP_INIT_FLAG(
+                 "RPAF_SetPort",
+                 rpaf_setport,
+                 NULL,
+                 RSRC_CONF,
+                 "Let mod_rpaf set the server port from the X-Port header"
                  ),
     AP_INIT_ITERATE(
-                    "RPAFproxy_ips",
-                    rpaf_set_proxy_ip,
-                    NULL,
-                    RSRC_CONF,
-                    "IP(s) of Proxy server setting X-Forwarded-For header"
-                    ),
+                 "RPAF_ProxyIPs",
+                 rpaf_set_proxy_ip,
+                 NULL,
+                 RSRC_CONF,
+                 "IP(s) of Proxy server setting X-Forwarded-For header"
+                 ),
     AP_INIT_TAKE1(
-                    "RPAFheader",
-                    rpaf_set_headername,
-                    NULL,
-                    RSRC_CONF,
-                    "Which header to look for when trying to find the real ip of the client in a proxy setup"
-                    ),
+                 "RPAF_Header",
+                 rpaf_set_headername,
+                 NULL,
+                 RSRC_CONF,
+                 "Which header to look for when trying to find the real ip of the client in a proxy setup"
+                 ),
     { NULL }
 };
 
