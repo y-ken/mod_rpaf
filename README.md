@@ -1,4 +1,4 @@
-## mod_rpaf - reverse proxy add forward
+## mod_rpaf - reverse proxy add forward for Apache 2.2
 
 ### Summary
 
@@ -98,3 +98,8 @@ It is forked following projects.
 * http://stderr.net/apache/rpaf/
 * https://github.com/ttkzw/mod_rpaf-0.6
 * https://github.com/gnif/mod_rpaf
+
+## Appendix
+
+Patch is available to use for Apache 2.4+
+http://blog.77jp.net/mod_rpaf-install-apache-2-4
