@@ -1,8 +1,9 @@
-## mod_rpaf - reverse proxy add forward for Apache 2.2
+## mod_rpaf - reverse proxy add forward
 
 ### Summary
 
-Sets `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` to the values provided by an upstream proxy.
+Apache-2.2 module for reverse proxy.
+Set `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` from upstream proxy environment variables.
 
 ### What is the difference from original mod_rpaf-0.6.
 
@@ -101,5 +102,5 @@ It is forked following projects.
 
 ## Appendix
 
-Patch is available to use for Apache 2.4+
+Patch is available for Apache 2.4+
 http://blog.77jp.net/mod_rpaf-install-apache-2-4
