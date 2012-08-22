@@ -241,11 +241,10 @@ static int change_remote_ip(request_rec *r) {
                     (httpsvalue = apr_table_get(r->headers_in, "X-HTTPS"))) {
                     apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, httpsvalue));
                     r->server->server_scheme = cfg->https_scheme;
-                } else if (strcmp("https", apr_table_get(r->headers_in, "X-Forwarded-Proto")) == 0) {
-                    apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, "on"));
-                    r->server->server_scheme = cfg->https_scheme;
-                } else {
-                    r->server->server_scheme = cfg->orig_scheme;
+                } else if (httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-Proto")) {
+					if (strcmp(httpsvalue, "https") == 0) {
+					   apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, "on"));
+					   r->server->server_scheme = cfg->https_scheme;
                 }
             }
 
@@ -255,8 +254,6 @@ static int change_remote_ip(request_rec *r) {
                     (portvalue = apr_table_get(r->headers_in, "X-Port"))) {
                     r->server->port    = atoi(portvalue);
                     r->parsed_uri.port = r->server->port;
-                } else {
-                    r->server->port = cfg->orig_port;
                 }
             }
         }
