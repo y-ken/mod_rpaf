@@ -2,7 +2,7 @@
 
 ### Summary
 
-Apache-2.2 module for reverse proxy.
+Apache-2.2 module for reverse proxy forked from mod_rpaf-0.6. <br>
 Set `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` from upstream proxy environment variables.
 
 ### What is the difference from original mod_rpaf-0.6.
