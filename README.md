@@ -9,8 +9,7 @@ Set `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` from upstream proxy environment vari
 
 * Feature: Add directive RPAFsethttps. It's compatible with AWS ELB.
 * Feature: Add directive RPAFsetport.
-* Feature: Support for partial IP address as '10.1.' for RPAFproxy_ips.
-* Feature: Support for rewrite for passing CIDRs in RPAFproxy_ips.
+* Feature: Support for partial IP address as '192.168.' for RPAFproxy_ips.
 * Bugfix: In the case of APR_HAVE_IPV6-enabled build, access control of Order/Allow/Deny does not work correctly.
 * Support of httpd 1.3 was deleted.
 
@@ -55,7 +54,7 @@ sudo dpkg -i ../libapache2-mod-rpaf_X.X-X.X_XXX.deb
 ````
 RPAFenable      (On|Off)           - Enable reverse proxy add forward
 
-RPAFproxy_ips    127.0.0.1 10.0.0.1 - What IPs to adjust requests for.
+RPAFproxy_ips   192.168. 10.0.0.   - What IPs to adjust requests for.
 
 RPAFheader      X-Forwarded-For    - The header to use for the real IP address.
 
@@ -72,13 +71,13 @@ RPAFsetport     (On|Off)           - Set the server port to the header value
 ## Example Configuration
 
 ````
-LoadModule        rpaf_module modules/mod_rpaf-2.0.so
+LoadModule       rpaf_module modules/mod_rpaf-2.0.so
 RPAFenable       On
-RPAFproxy_ips     127.0.0.1 10.0.0.1/28
+RPAFproxy_ips    192.168. 10.0.0.
 RPAFheader       X-Forwarded-For
-RPAFsetHostname  On
-RPAFsethttps     On
-RPAFsetport      On
+RPAFsetHostname  Off
+RPAFsethttps     Off
+RPAFsetport      Off
 ````
 
 ## Authors
