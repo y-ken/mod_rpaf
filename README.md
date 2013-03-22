@@ -13,17 +13,10 @@ Set `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` from upstream proxy environment vari
 * Bugfix: In the case of APR_HAVE_IPV6-enabled build, access control of Order/Allow/Deny does not work correctly.
 * Support of httpd 1.3 was deleted.
 
-### Install with rpm package for RedHat/CentOS 5.x
-
-````
-wget http://y-ken.github.com/package/centos/5/x86_64/mod_rpaf-fork-0.6-4.x86_64.rpm
-rpm -ivh mod_rpaf-fork-0.6-4.x86_64.rpm
-````
-
 ### Install with rpm package for RedHat/CentOS 6.x
 
 ````
-yum localinstall http://y-ken.github.com/package/centos/6/x86_64/mod_rpaf-fork-0.6-4.el6.x86_64.rpm
+yum localinstall http://y-ken.github.com/package/centos/6/x86_64/mod_rpaf-fork-0.6-5.el6.x86_64.rpm
 ````
 
 ### Compile and Install for RedHat/CentOS
