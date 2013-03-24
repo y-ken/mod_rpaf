@@ -54,8 +54,8 @@ RPAFheader      X-Forwarded-For    - The header to use for the real IP address.
 RPAFsetHostname (On|Off)           - Update vhost name so ServerName & ServerAlias work
 
 RPAFsethttps    (On|Off)           - Set the HTTPS environment variable to the header value 
-                                     contained in X-HTTPS, or X-Forwarded-HTTPS.
-                                     Also work with X-Forwarded-Proto were https.
+                                     contained in X-HTTPS, or X-Forwarded-HTTPS. (experimental)
+                                     Also work with X-Forwarded-Proto value were https.
 
 RPAFsetport     (On|Off)           - Set the server port to the header value 
                                      contained in X-Port, or X-Forwarded-Port.
