@@ -8,7 +8,6 @@ Set `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` from upstream proxy environment vari
 ### What is the difference from original mod_rpaf-0.6.
 
 * Feature: Add directive RPAFsethttps. It's compatible with AWS ELB.
-* Feature: Add directive RPAFsetport.
 * Feature: Support for partial IP address as '192.168.' for RPAFproxy_ips.
 * Bugfix: In the case of APR_HAVE_IPV6-enabled build, access control of Order/Allow/Deny does not work correctly.
 * Support of httpd 1.3 was deleted.
@@ -56,10 +55,9 @@ RPAFsetHostname (On|Off)           - Update vhost name so ServerName & ServerAli
 RPAFsethttps    (On|Off)           - Set the HTTPS environment variable to the header value 
                                      contained in X-HTTPS, or X-Forwarded-HTTPS. (experimental)
                                      Also work with X-Forwarded-Proto value were https.
-
-RPAFsetport     (On|Off)           - Set the server port to the header value 
-                                     contained in X-Port, or X-Forwarded-Port.
 ````
+
+**Note:** The feature of `RPAFsetport` has deleted due to not working for current Apache architecture.
 
 ## Example Configuration
 
@@ -70,7 +68,6 @@ RPAFproxy_ips    192.168. 10.0.0.
 RPAFheader       X-Forwarded-For
 RPAFsetHostname  Off
 RPAFsethttps     Off
-RPAFsetport      Off
 ````
 
 ## Authors

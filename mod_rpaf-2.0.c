@@ -30,7 +30,6 @@ typedef struct {
     int                enable;
     int                sethostname;
     int                sethttps;
-    int                setport;
     const char         *headername;
     apr_array_header_t *proxy_ips;
     const char         *orig_scheme;
@@ -103,15 +102,6 @@ static const char *rpaf_sethttps(cmd_parms *cmd, void *dummy, int flag) {
                                                                    &rpaf_module);
 
     cfg->sethttps = flag;
-    return NULL;
-}
-
-static const char *rpaf_setport(cmd_parms *cmd, void *dummy, int flag) {
-    server_rec *s = cmd->server;
-    rpaf_server_cfg *cfg = (rpaf_server_cfg *)ap_get_module_config(s->module_config, 
-                                                                   &rpaf_module);
-
-    cfg->setport = flag;
     return NULL;
 }
 
@@ -196,15 +186,6 @@ static int change_remote_ip(request_rec *r) {
                     r->server->server_scheme = cfg->https_scheme;
                 }
             }
-            
-            if (cfg->setport) {
-                const char *portvalue;
-                if ((portvalue = apr_table_get(r->headers_in, "X-Forwarded-Port")) ||
-                    (portvalue = apr_table_get(r->headers_in, "X-Port"))) {
-                    r->server->port    = atoi(portvalue);
-                    r->parsed_uri.port = r->server->port;
-                }
-            }
         }
     }
     return DECLINED;
@@ -231,13 +212,6 @@ static const command_rec rpaf_cmds[] = {
                  NULL,
                  RSRC_CONF,
                  "Let mod_rpaf set the HTTPS environment variable from the X-HTTPS or X-Forwarded-HTTPS or X-Forwarded-Proto header"
-                 ),
-    AP_INIT_FLAG(
-                 "RPAFsetport",
-                 rpaf_setport,
-                 NULL,
-                 RSRC_CONF,
-                 "Let mod_rpaf set the server port from the X-Port header"
                  ),
     AP_INIT_ITERATE(
                  "RPAFproxy_ips",
