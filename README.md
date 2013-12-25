@@ -61,6 +61,10 @@ RPAFsetport     (On|Off)           - Set the server port to the header value
                                      contained in X-Port, or X-Forwarded-Port.
 ````
 
+**Note:** The option of `RPAFsetport` has limitation. It only work for one virtualhost on localhost:80, and you only send requests like
+X-Forwarded-Port: 443.  
+Do not use this option for the regular multi domain hosted server due to current Apache architecture.
+
 ## Example Configuration
 
 ````
