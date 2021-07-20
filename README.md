@@ -16,7 +16,7 @@ Set `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` from upstream proxy environment vari
 ### Install with rpm package for RedHat/CentOS 6.x
 
 ````
-yum localinstall http://y-ken.github.com/package/centos/6/x86_64/mod_rpaf-fork-0.6-5.el6.x86_64.rpm
+yum localinstall http://y-ken.github.io/package/centos/6/x86_64/mod_rpaf-fork-0.6-5.el6.x86_64.rpm
 ````
 
 ### Compile and Install for RedHat/CentOS
