@@ -1,0 +1,27 @@
+{
+  // mod_rpaf-2.0.c targets the Apache 2.2 API, which only ships on legacy
+  // distributions (CentOS 6, glibc 2.12). That glibc is too old to run the
+  // VS Code server, so the dev container itself uses a modern base for
+  // editing, and the actual build/test runs in a CentOS 6 container via the
+  // docker-in-docker feature -- exactly the same command the CI uses:
+  //
+  //     docker run --rm --platform linux/amd64 \
+  //       -v "$PWD":/work -w /work centos:6 bash test/run-ci.sh
+  //
+  "name": "mod_rpaf",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  // Apache 2.4 dev headers give the editor reasonable IntelliSense for the
+  // httpd/APR symbols (the 2.2-only paths still won't fully resolve), and the
+  // CentOS 6 image is pre-pulled so the first test run is fast.
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y apache2-dev && docker pull --platform linux/amd64 centos:6",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools"
+      ]
+    }
+  }
+}

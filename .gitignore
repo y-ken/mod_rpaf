@@ -1,0 +1,10 @@
+# Build artifacts (apxs / libtool)
+*.o
+*.lo
+*.slo
+*.la
+*.lai
+*.a
+*.so
+.libs/
+*~

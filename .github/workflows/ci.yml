@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build & test on Apache 2.2 (CentOS 6)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # mod_rpaf-2.0.c targets the Apache 2.2 API (e.g. connection->remote_ip),
+      # which was removed in 2.4, so the module is built and tested inside a
+      # CentOS 6 container that ships Apache 2.2. Checkout runs on the host to
+      # avoid the legacy container's old glibc, then the build/test runs in the
+      # container against the mounted workspace.
+      - name: Build and run functional tests
+        run: |
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}":/work -w /work \
+            centos:6 bash test/run-ci.sh
