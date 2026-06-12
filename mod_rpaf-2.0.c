@@ -25,6 +25,21 @@
 #include "apr_lib.h"
 #include "arpa/inet.h"
 
+/* Apache 2.4 removed conn_rec->remote_ip / remote_addr and exposes the client
+   address on the request as useragent_ip / useragent_addr instead. Map to
+   whichever the running version provides so the module builds and works on
+   both 2.2 (CentOS 6) and 2.4 (CentOS 7). */
+#if AP_SERVER_MAJORVERSION_NUMBER > 2 || \
+    (AP_SERVER_MAJORVERSION_NUMBER == 2 && AP_SERVER_MINORVERSION_NUMBER >= 4)
+  #define RPAF_IP   useragent_ip
+  #define RPAF_ADDR useragent_addr
+  #define RPAF_POOL pool
+#else
+  #define RPAF_IP   connection->remote_ip
+  #define RPAF_ADDR connection->remote_addr
+  #define RPAF_POOL connection->pool
+#endif
+
 module AP_MODULE_DECLARE_DATA rpaf_module;
 APR_DECLARE_OPTIONAL_FN(int, ssl_is_https, (conn_rec *));
 
@@ -169,9 +184,9 @@ static const char *last_not_in_array(apr_array_header_t *forwarded_for,
 
 static apr_status_t rpaf_cleanup(void *data) {
     rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)data;
-    rcr->r->connection->remote_ip = apr_pstrdup(rcr->r->connection->pool, rcr->old_ip);
-    rcr->r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(rcr->r->connection->remote_ip);
-    rcr->r->connection->remote_addr->sa.sin.sin_family = rcr->old_family;
+    rcr->r->RPAF_IP = apr_pstrdup(rcr->r->RPAF_POOL, rcr->old_ip);
+    rcr->r->RPAF_ADDR->sa.sin.sin_addr.s_addr = apr_inet_addr(rcr->r->RPAF_IP);
+    rcr->r->RPAF_ADDR->sa.sin.sin_family = rcr->old_family;
     apr_table_unset(rcr->r->connection->notes, "rpaf_https");
     return APR_SUCCESS;
 }
@@ -192,7 +207,7 @@ static int change_remote_ip(request_rec *r) {
         return DECLINED;
     }
 
-    if (is_in_array(r->connection->remote_ip, cfg->proxy_ips) == 1) {
+    if (is_in_array(r->RPAF_IP, cfg->proxy_ips) == 1) {
         /* check if cfg->headername is set and if it is use
            that instead of X-Forwarded-For by default */
         if (cfg->headername && (fwdvalue = apr_table_get(r->headers_in, cfg->headername))) {
@@ -234,14 +249,14 @@ static int change_remote_ip(request_rec *r) {
                 return DECLINED;
 
             rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
-            rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->remote_ip);
-            rcr->old_family = r->connection->remote_addr->sa.sin.sin_family;
+            rcr->old_ip = apr_pstrdup(r->RPAF_POOL, r->RPAF_IP);
+            rcr->old_family = r->RPAF_ADDR->sa.sin.sin_family;
             rcr->r = r;
             apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
-            r->connection->remote_ip = apr_pstrdup(r->connection->pool, last_val);
-            r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(r->connection->remote_ip);
-            r->connection->remote_addr->family = AF_INET;
-            r->connection->remote_addr->sa.sin.sin_family = AF_INET;
+            r->RPAF_IP = apr_pstrdup(r->RPAF_POOL, last_val);
+            r->RPAF_ADDR->sa.sin.sin_addr.s_addr = apr_inet_addr(r->RPAF_IP);
+            r->RPAF_ADDR->family = AF_INET;
+            r->RPAF_ADDR->sa.sin.sin_family = AF_INET;
 
             if (cfg->sethostname) {
                 const char *hostvalue;

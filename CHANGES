@@ -1,3 +1,9 @@
+Apache 2.4 support (closes #3):
+ - conn_rec->remote_ip / remote_addr were removed in Apache 2.4 in favour of
+   the request-level useragent_ip / useragent_addr. The module now selects the
+   right fields at compile time, so it builds and runs on both Apache 2.2
+   (CentOS 6) and Apache 2.4 (CentOS 7). CI exercises both via a matrix.
+
 Ported bug fixes from gnif/mod_rpaf:
  - Behind a chain of proxies, use the last forwarded entry that is not a
    trusted proxy as the client IP, instead of always taking the last entry.

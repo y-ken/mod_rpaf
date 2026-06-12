@@ -1,28 +1,37 @@
 #!/bin/bash
 #
-# Build mod_rpaf on Apache 2.2 (CentOS 6) and run a functional access-control
-# test that reproduces https://github.com/y-ken/mod_rpaf/pull/2 :
+# Build mod_rpaf and run a functional access-control test that reproduces
+# https://github.com/y-ken/mod_rpaf/pull/2 :
 #
 #   * a request forwarded by a trusted proxy is authorised based on the client
 #     IP that mod_rpaf restores from X-Forwarded-For (not the proxy address).
 #
-# The script is meant to run inside a `centos:6` container with the repository
-# mounted at the current working directory. It is used by both the GitHub
-# Actions CI workflow and local `docker run` invocations.
+# The script runs inside a CentOS container with the repository mounted at the
+# current working directory, and works on both CentOS 6 (Apache 2.2) and
+# CentOS 7 (Apache 2.4). It is used by both the GitHub Actions CI workflow and
+# local `docker run` invocations.
 #
 set -eux
 
 # ---------------------------------------------------------------------------
-# 1. CentOS 6 is EOL: repoint yum from the dead mirrors to vault.centos.org
+# 1. CentOS 6 and 7 are EOL: repoint yum from the dead mirrors to vault
 # ---------------------------------------------------------------------------
-sed -e 's|^mirrorlist=|#mirrorlist=|g' \
-    -e 's|^#\?baseurl=http://mirror.centos.org|baseurl=https://vault.centos.org|g' \
-    -i /etc/yum.repos.d/CentOS-Base.repo
+EL=$(rpm -E %{rhel})
+if [ "$EL" = "6" ]; then
+    sed -e 's|^mirrorlist=|#mirrorlist=|g' \
+        -e 's|^#\?baseurl=http://mirror.centos.org|baseurl=https://vault.centos.org|g' \
+        -i /etc/yum.repos.d/CentOS-Base.repo
+else
+    sed -e 's|^mirrorlist=|#mirrorlist=|g' \
+        -e 's|^#\?baseurl=http://mirror.centos.org/centos/$releasever|baseurl=http://vault.centos.org/7.9.2009|g' \
+        -i /etc/yum.repos.d/CentOS-Base.repo
+fi
 
 # ---------------------------------------------------------------------------
-# 2. Install build + runtime dependencies
+# 2. Install build + runtime dependencies ('which' is required by the Makefile
+#    and is not present on the minimal CentOS 7 image)
 # ---------------------------------------------------------------------------
-yum -y install httpd httpd-devel gcc make curl
+yum -y install httpd httpd-devel gcc make which curl
 
 # ---------------------------------------------------------------------------
 # 3. Build and install the module
