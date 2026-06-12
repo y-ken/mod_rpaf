@@ -11,7 +11,7 @@ jobs:
     name: Build & test on Apache 2.2 (CentOS 6)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # mod_rpaf-2.0.c targets the Apache 2.2 API (e.g. connection->remote_ip),
       # which was removed in 2.4, so the module is built and tested inside a
