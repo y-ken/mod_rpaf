@@ -5,6 +5,10 @@
 Apache-2.2 module for reverse proxy forked from mod_rpaf-0.6. <br>
 Set `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` from upstream proxy environment variables.
 
+This module targets Apache 2.2. On Apache 2.4 and later it is not needed —
+use the bundled [`mod_remoteip`](https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html)
+instead.
+
 ### What is the difference from original mod_rpaf-0.6.
 
 * Feature: Add directive RPAFsethttps. It's compatible with AWS ELB.
@@ -82,6 +86,24 @@ RPAFsethttps     Off
 RPAFsetport      Off
 ````
 
+## Testing
+
+This module targets the Apache 2.2 API, so the tests build and run it inside a
+CentOS 6 container (which ships Apache 2.2). With Docker available you can run
+the same suite that CI runs:
+
+````
+docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work \
+  centos:6 bash test/run-ci.sh
+````
+
+It builds the module, starts Apache, and checks `X-Forwarded-For` access
+control, real-client resolution behind a chain of proxies, and
+`RewriteCond %{HTTPS}` handling. The same command runs automatically on push to
+`master` and on pull requests via GitHub Actions (`.github/workflows/ci.yml`).
+A VS Code Dev Container (`.devcontainer/`) is also provided for editing with the
+build/test toolchain one command away.
+
 ## Authors
 
 * Thomas Eibner <thomas@stderr.net>
@@ -103,5 +125,8 @@ It is forked following projects.
 
 ## Appendix
 
-Patch is available for Apache 2.4+
+For Apache 2.4 and later, use the bundled `mod_remoteip` instead of this module.
+
+An old community patch for building this module on Apache 2.4+ also exists
+(unsupported here):
 http://blog.77jp.net/mod_rpaf-install-apache-2-4
