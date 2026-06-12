@@ -11,6 +11,10 @@ Set `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` from upstream proxy environment vari
 * Feature: Add directive RPAFsetport.
 * Feature: Support for partial IP address as '192.168.' for RPAFproxy_ips.
 * Bugfix: In the case of APR_HAVE_IPV6-enabled build, access control of Order/Allow/Deny does not work correctly.
+* Bugfix: `RPAFsethttps` now also sets the SSL flag used by `RewriteCond %{HTTPS}`, not only `%{ENV:HTTPS}` (ported from gnif/mod_rpaf#6).
+* Bugfix: Behind a chain of proxies the real client IP (the last forwarded entry that is not a trusted proxy) is now used, instead of always taking the last entry.
+* Bugfix: Invalid `X-Forwarded-For` entries are validated and skipped instead of being trusted blindly.
+* Bugfix: `RPAFsetport` no longer mutates the shared server_rec, so it is safe to use with multiple virtualhosts.
 * Support of httpd 1.3 was deleted.
 
 ### Install with rpm package for RedHat/CentOS 6.x
@@ -61,9 +65,10 @@ RPAFsetport     (On|Off)           - Set the server port to the header value
                                      contained in X-Port, or X-Forwarded-Port.
 ````
 
-**Note:** The option of `RPAFsetport` has limitation. It only work for one virtualhost on localhost:80, and you only send requests like
-X-Forwarded-Port: 443.  
-Do not use this option for the regular multi domain hosted server due to current Apache architecture.
+**Note:** `RPAFsetport` now applies the forwarded port per request (via
+`r->parsed_uri.port`) instead of mutating the shared server configuration, so
+the previous limitation of working with only a single virtualhost no longer
+applies.
 
 ## Example Configuration
 

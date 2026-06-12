@@ -95,6 +95,12 @@ check "allowed client IP" "1.1.1.1" "200"
 # Forwarded client IP is not in the Allow list -> 403
 check "denied client IP"  "2.2.2.2" "403"
 
+# Multi-proxy chain: a trailing trusted-proxy entry is skipped and the real
+# client (1.1.1.1) is used for access control.
+check "multi-proxy real client" "1.1.1.1, 127.0.0.1" "200"
+# Bogus forwarded entries are rejected, leaving the valid client IP in effect.
+check "invalid entry skipped"    "1.1.1.1, not-an-ip" "200"
+
 # %{HTTPS} via mod_rewrite (gnif/mod_rpaf#6). A trusted proxy must supply
 # X-Forwarded-For for mod_rpaf to process the request, so it is always sent.
 checkhttps() {
