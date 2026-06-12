@@ -37,11 +37,20 @@ make install
 cat > /etc/httpd/conf.d/rpaf-test.conf <<'EOF'
 ServerName localhost
 
+# Force a single child process so the server_scheme leak test is deterministic:
+# every request is handled by the same process and thus the same server_rec.
+StartServers    1
+MinSpareServers 1
+MaxSpareServers 1
+ServerLimit     1
+MaxClients      1
+
 LoadModule rpaf_module modules/mod_rpaf-2.0.so
-RPAFenable    On
-RPAFproxy_ips 127.0.0.1
-RPAFheader    X-Forwarded-For
-RPAFsethttps  On
+RPAFenable      On
+RPAFproxy_ips   127.0.0.1
+RPAFheader      X-Forwarded-For
+RPAFsethttps    On
+RPAFsethostname On
 
 # Reproduces y-ken/mod_rpaf#2: access is granted based on the client IP that
 # mod_rpaf restores from X-Forwarded-For, not the trusted proxy's own address.
@@ -58,11 +67,20 @@ RewriteEngine On
 RewriteCond %{HTTPS} =on
 RewriteRule ^/https_check$ /https_is_on  [L]
 RewriteRule ^/https_check$ /https_is_off [L]
+
+# RPAFsethostname: when X-Forwarded-Host carries a comma-separated list the
+# last entry must become the effective Host.
+RewriteCond %{HTTP_HOST} =second.example
+RewriteRule ^/host_check$ /host_is_second [L]
+RewriteRule ^/host_check$ /host_is_other  [L]
 EOF
 
-echo ok  > /var/www/html/rpaf_test
-echo on  > /var/www/html/https_is_on
-echo off > /var/www/html/https_is_off
+echo ok     > /var/www/html/rpaf_test
+echo on     > /var/www/html/https_is_on
+echo off    > /var/www/html/https_is_off
+echo second > /var/www/html/host_is_second
+echo other  > /var/www/html/host_is_other
+mkdir -p /var/www/html/dir
 
 # ---------------------------------------------------------------------------
 # 5. Start Apache and wait until it accepts connections
@@ -123,6 +141,39 @@ checkhttps() {
 checkhttps "HTTPS on via X-Forwarded-Proto: https" "https" "on"
 # No forwarded proto leaves %{HTTPS} off
 checkhttps "HTTPS off without X-Forwarded-Proto"    ""      "off"
+
+# Minor 2: a non-truthy X-Forwarded-HTTPS value must not be treated as https.
+body=$(curl -s -H "X-Forwarded-For: 1.1.1.1" -H "X-Forwarded-HTTPS: off" \
+            http://localhost/https_check)
+if [ "$body" = "off" ]; then
+    echo "PASS: X-Forwarded-HTTPS: off is not treated as https -> %{HTTPS}=off"
+else
+    echo "FAIL: X-Forwarded-HTTPS: off -> expected %{HTTPS}=off, got ${body}"
+    fail=1
+fi
+
+# Minor 1: the last entry of a comma-separated X-Forwarded-Host wins.
+body=$(curl -s -H "X-Forwarded-For: 1.1.1.1" \
+            -H "X-Forwarded-Host: first.example, second.example" \
+            http://localhost/host_check)
+if [ "$body" = "second" ]; then
+    echo "PASS: last X-Forwarded-Host entry becomes the Host -> ${body}.example"
+else
+    echo "FAIL: X-Forwarded-Host list -> expected Host second.example, got ${body}"
+    fail=1
+fi
+
+# Fix F: a https request must not leak server_scheme into later plain requests
+# handled by the same child process. After a https-forwarded request, the
+# mod_dir redirect for /dir (sent without a forwarded proto) must stay http://.
+curl -s -o /dev/null -H "X-Forwarded-For: 1.1.1.1" -H "X-Forwarded-Proto: https" \
+     http://localhost/https_check
+redir=$(curl -s -o /dev/null -w '%{redirect_url}' \
+             -H "X-Forwarded-For: 1.1.1.1" http://localhost/dir)
+case "$redir" in
+    http://*)  echo "PASS: server_scheme not leaked across requests -> ${redir}" ;;
+    *)         echo "FAIL: server_scheme leaked, redirect was -> ${redir}"; fail=1 ;;
+esac
 
 if [ "$fail" -ne 0 ]; then
     echo "----- error_log -----"

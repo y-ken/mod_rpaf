@@ -19,6 +19,9 @@ instead.
 * Bugfix: Behind a chain of proxies the real client IP (the last forwarded entry that is not a trusted proxy) is now used, instead of always taking the last entry.
 * Bugfix: Invalid `X-Forwarded-For` entries are validated and skipped instead of being trusted blindly.
 * Bugfix: `RPAFsetport` no longer mutates the shared server_rec, so it is safe to use with multiple virtualhosts.
+* Bugfix: `RPAFsethttps` no longer leaks the `https` scheme into later plain-HTTP requests on the same server (the scheme is reset per request).
+* Bugfix: `RPAFsethttps` validates the forwarded HTTPS header value, so a value like `off` is no longer treated as HTTPS.
+* Bugfix: A comma-separated `X-Forwarded-Host` now uses its last entry as the effective Host.
 * Support of httpd 1.3 was deleted.
 
 ### Install with rpm package for RedHat/CentOS 6.x

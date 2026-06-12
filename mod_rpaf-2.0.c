@@ -142,6 +142,16 @@ static int rpaf_looks_like_ip(const char *ipstr) {
     return (*ptr == '\0');
 }
 
+/* True when a forwarded HTTPS header value indicates an SSL request. Avoids
+   trusting an arbitrary value (e.g. "off") as if it meant https. */
+static int rpaf_https_is_on(const char *value) {
+    return value && (strcasecmp(value, "on")    == 0 ||
+                     strcasecmp(value, "1")      == 0 ||
+                     strcasecmp(value, "true")   == 0 ||
+                     strcasecmp(value, "yes")    == 0 ||
+                     strcasecmp(value, "https")  == 0);
+}
+
 /* Return the last entry in the forwarded-for list that is not one of our
    trusted proxies -- i.e. the real client behind a chain of proxies -- or
    NULL if every entry is a trusted proxy (or the list is empty). */
@@ -235,31 +245,52 @@ static int change_remote_ip(request_rec *r) {
 
             if (cfg->sethostname) {
                 const char *hostvalue;
-                if ((hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host"))) {
-                    /* 2.0 proxy frontend or 1.3 => 1.3.25 proxy frontend */
-                    apr_table_set(r->headers_in, "Host", apr_pstrdup(r->pool, hostvalue));
-                    r->hostname = apr_pstrdup(r->pool, hostvalue);
-                    ap_update_vhost_from_headers(r);
-                } else if ((hostvalue = apr_table_get(r->headers_in, "X-Host"))) {
-                    /* 1.3 proxy frontend with mod_proxy_add_forward */
-                    apr_table_set(r->headers_in, "Host", apr_pstrdup(r->pool, hostvalue));
-                    r->hostname = apr_pstrdup(r->pool, hostvalue);
-                    ap_update_vhost_from_headers(r);
+                /* X-Forwarded-Host (2.0 frontends) or X-Host (1.3 frontends) */
+                if ((hostvalue = apr_table_get(r->headers_in, "X-Forwarded-Host")) ||
+                    (hostvalue = apr_table_get(r->headers_in, "X-Host"))) {
+                    /* The header may carry a comma-separated list; the last
+                       entry is the one added by the nearest proxy. */
+                    char *host, *last = NULL;
+                    while (*hostvalue && (host = ap_get_token(r->pool, &hostvalue, 1))) {
+                        apr_size_t len;
+                        while (apr_isspace(*host))
+                            ++host;
+                        len = strlen(host);
+                        while (len > 0 && apr_isspace(host[len - 1]))
+                            host[--len] = '\0';
+                        if (*host)
+                            last = host;
+                        if (*hostvalue != '\0')
+                            ++hostvalue;
+                    }
+                    if (last) {
+                        apr_table_set(r->headers_in, "Host", apr_pstrdup(r->pool, last));
+                        r->hostname = apr_pstrdup(r->pool, last);
+                        ap_update_vhost_from_headers(r);
+                    }
                 }
             }
             
             if (cfg->sethttps) {
                 const char *httpsvalue;
+                int is_https;
                 if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-HTTPS")) ||
                     (httpsvalue = apr_table_get(r->headers_in, "X-HTTPS"))) {
-                    apr_table_set(r->connection->notes, "rpaf_https", httpsvalue);
-                    apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, httpsvalue));
-                    r->server->server_scheme = cfg->https_scheme;
-                } else if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-Proto")) != NULL &&
-                    (strcmp(httpsvalue, "https") == 0)) {
+                    is_https = rpaf_https_is_on(httpsvalue);
+                } else {
+                    httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-Proto");
+                    is_https = (httpsvalue != NULL && strcasecmp(httpsvalue, "https") == 0);
+                }
+
+                if (is_https) {
                     apr_table_set(r->connection->notes, "rpaf_https", "on");
-                    apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, "on"));
+                    apr_table_set(r->subprocess_env, "HTTPS", "on");
                     r->server->server_scheme = cfg->https_scheme;
+                } else {
+                    /* Reset the scheme so an earlier https request on this
+                       shared server_rec does not leak into later plain
+                       requests on the same vhost. */
+                    r->server->server_scheme = cfg->orig_scheme;
                 }
             }
             

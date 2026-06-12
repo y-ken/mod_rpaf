@@ -7,6 +7,14 @@ Ported bug fixes from gnif/mod_rpaf:
    mutating the shared server_rec, which previously leaked the port across
    requests and virtualhosts.
 
+Additional fixes in the server_scheme / hostname / https handling:
+ - RPAFsethttps no longer leaves r->server->server_scheme set to "https"
+   after an https request; it is reset per request so plain-HTTP requests on
+   the same server no longer generate https self-referential URLs.
+ - RPAFsethttps validates the forwarded HTTPS header value (on/1/true/yes/
+   https), so a value such as "off" is no longer treated as https.
+ - RPAFsethostname uses the last entry of a comma-separated X-Forwarded-Host.
+
 Keep Alive Problem reported and patched by Christian Schneider
  Also reported by Hiroyuki OYAMA and Vladimir Klebanov
 mod_rpaf was incorrectly using r->pool to allocate memory for the
