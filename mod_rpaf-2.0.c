@@ -21,9 +21,11 @@
 #include "http_protocol.h"
 #include "http_vhost.h"
 #include "apr_strings.h"
+#include "apr_optional.h"
 #include "arpa/inet.h"
 
 module AP_MODULE_DECLARE_DATA rpaf_module;
+APR_DECLARE_OPTIONAL_FN(int, ssl_is_https, (conn_rec *));
 
 typedef struct {
     int                enable;
@@ -129,6 +131,7 @@ static apr_status_t rpaf_cleanup(void *data) {
     rcr->r->connection->remote_ip = apr_pstrdup(rcr->r->connection->pool, rcr->old_ip);
     rcr->r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(rcr->r->connection->remote_ip);
     rcr->r->connection->remote_addr->sa.sin.sin_family = rcr->old_family;
+    apr_table_unset(rcr->r->connection->notes, "rpaf_https");
     return APR_SUCCESS;
 }
 
@@ -140,6 +143,13 @@ static int change_remote_ip(request_rec *r) {
 
     if (!cfg->enable)
         return DECLINED;
+
+    /* mod_rewrite がこの関数を再呼び出しする際に subprocess_env の HTTPS が失われる問題の回避 */
+    const char *rpaf_https = apr_table_get(r->connection->notes, "rpaf_https");
+    if (rpaf_https) {
+        apr_table_set(r->subprocess_env, "HTTPS", rpaf_https);
+        return DECLINED;
+    }
 
     if (is_in_array(r->connection->remote_ip, cfg->proxy_ips) == 1) {
         /* check if cfg->headername is set and if it is use
@@ -188,10 +198,12 @@ static int change_remote_ip(request_rec *r) {
                 const char *httpsvalue;
                 if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-HTTPS")) ||
                     (httpsvalue = apr_table_get(r->headers_in, "X-HTTPS"))) {
+                    apr_table_set(r->connection->notes, "rpaf_https", httpsvalue);
                     apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, httpsvalue));
                     r->server->server_scheme = cfg->https_scheme;
                 } else if ((httpsvalue = apr_table_get(r->headers_in, "X-Forwarded-Proto")) != NULL &&
                     (strcmp(httpsvalue, "https") == 0)) {
+                    apr_table_set(r->connection->notes, "rpaf_https", "on");
                     apr_table_set(r->subprocess_env, "HTTPS", apr_pstrdup(r->pool, "on"));
                     r->server->server_scheme = cfg->https_scheme;
                 }
@@ -256,8 +268,16 @@ static const command_rec rpaf_cmds[] = {
     { NULL }
 };
 
+static int ssl_is_https(conn_rec *c) {
+    return apr_table_get(c->notes, "rpaf_https") != NULL;
+}
+
 static void register_hooks(apr_pool_t *p) {
     ap_hook_post_read_request(change_remote_ip, NULL, NULL, APR_HOOK_FIRST);
+
+    /* mod_ssl が未ロードの場合のみ ssl_is_https を登録し、%{HTTPS} を mod_rewrite で使えるようにする */
+    if (APR_RETRIEVE_OPTIONAL_FN(ssl_is_https) == NULL)
+        APR_REGISTER_OPTIONAL_FN(ssl_is_https);
 }
 
 module AP_MODULE_DECLARE_DATA rpaf_module = {
