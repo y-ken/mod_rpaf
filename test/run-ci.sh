@@ -41,6 +41,7 @@ LoadModule rpaf_module modules/mod_rpaf-2.0.so
 RPAFenable    On
 RPAFproxy_ips 127.0.0.1
 RPAFheader    X-Forwarded-For
+RPAFsethttps  On
 
 # Reproduces y-ken/mod_rpaf#2: access is granted based on the client IP that
 # mod_rpaf restores from X-Forwarded-For, not the trusted proxy's own address.
@@ -49,9 +50,19 @@ RPAFheader    X-Forwarded-For
   Deny  from all
   Allow from 1.1.1.1
 </Location>
+
+# Reproduces gnif/mod_rpaf#6: mod_rewrite resolves %{HTTPS} through the
+# ssl_is_https optional function, so X-Forwarded-Proto: https must make
+# RewriteCond %{HTTPS} match directly (not only %{ENV:HTTPS}).
+RewriteEngine On
+RewriteCond %{HTTPS} =on
+RewriteRule ^/https_check$ /https_is_on  [L]
+RewriteRule ^/https_check$ /https_is_off [L]
 EOF
 
-echo ok > /var/www/html/rpaf_test
+echo ok  > /var/www/html/rpaf_test
+echo on  > /var/www/html/https_is_on
+echo off > /var/www/html/https_is_off
 
 # ---------------------------------------------------------------------------
 # 5. Start Apache and wait until it accepts connections
@@ -78,10 +89,34 @@ check() {
     fi
 }
 
+# X-Forwarded-For access control (y-ken/mod_rpaf#2)
 # Forwarded client IP is in the Allow list -> 200
 check "allowed client IP" "1.1.1.1" "200"
 # Forwarded client IP is not in the Allow list -> 403
 check "denied client IP"  "2.2.2.2" "403"
+
+# %{HTTPS} via mod_rewrite (gnif/mod_rpaf#6). A trusted proxy must supply
+# X-Forwarded-For for mod_rpaf to process the request, so it is always sent.
+checkhttps() {
+    desc="$1"; proto="$2"; want="$3"
+    if [ -n "$proto" ]; then
+        got=$(curl -s -H "X-Forwarded-For: 1.1.1.1" \
+                   -H "X-Forwarded-Proto: ${proto}" http://localhost/https_check)
+    else
+        got=$(curl -s -H "X-Forwarded-For: 1.1.1.1" http://localhost/https_check)
+    fi
+    if [ "$got" = "$want" ]; then
+        echo "PASS: ${desc} -> %{HTTPS}=${got}"
+    else
+        echo "FAIL: ${desc} -> expected %{HTTPS}=${want}, got ${got}"
+        fail=1
+    fi
+}
+
+# X-Forwarded-Proto: https makes RewriteCond %{HTTPS} match
+checkhttps "HTTPS on via X-Forwarded-Proto: https" "https" "on"
+# No forwarded proto leaves %{HTTPS} off
+checkhttps "HTTPS off without X-Forwarded-Proto"    ""      "off"
 
 if [ "$fail" -ne 0 ]; then
     echo "----- error_log -----"
