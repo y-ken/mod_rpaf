@@ -22,6 +22,7 @@
 #include "http_vhost.h"
 #include "apr_strings.h"
 #include "apr_optional.h"
+#include "apr_lib.h"
 #include "arpa/inet.h"
 
 module AP_MODULE_DECLARE_DATA rpaf_module;
@@ -126,6 +127,36 @@ static int is_in_array(const char *remote_ip, apr_array_header_t *proxy_ips) {
     return 0;
 }
 
+/* Cheap sanity check that a string looks like an IPv4 or IPv6 address, used
+   to reject bogus X-Forwarded-For tokens before trusting them. */
+static int rpaf_looks_like_ip(const char *ipstr) {
+    static const char ipv4_set[] = "0123456789./";
+    static const char ipv6_set[] = "0123456789abcdefABCDEF:./";
+    const char *set = strchr(ipstr, ':') ? ipv6_set : ipv4_set;
+    const char *ptr = ipstr;
+
+    if (!*ipstr)
+        return 0;
+    while (*ptr && strchr(set, *ptr) != NULL)
+        ++ptr;
+    return (*ptr == '\0');
+}
+
+/* Return the last entry in the forwarded-for list that is not one of our
+   trusted proxies -- i.e. the real client behind a chain of proxies -- or
+   NULL if every entry is a trusted proxy (or the list is empty). */
+static const char *last_not_in_array(apr_array_header_t *forwarded_for,
+                                     apr_array_header_t *proxy_ips) {
+    char **fwd_ips = (char **)forwarded_for->elts;
+    int i;
+
+    for (i = forwarded_for->nelts - 1; i >= 0; i--) {
+        if (!is_in_array(fwd_ips[i], proxy_ips))
+            return fwd_ips[i];
+    }
+    return NULL;
+}
+
 static apr_status_t rpaf_cleanup(void *data) {
     rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)data;
     rcr->r->connection->remote_ip = apr_pstrdup(rcr->r->connection->pool, rcr->old_ip);
@@ -163,18 +194,41 @@ static int change_remote_ip(request_rec *r) {
         }
 
         if (fwdvalue) {
-            rpaf_cleanup_rec *rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
+            const char *last_val;
+            rpaf_cleanup_rec *rcr;
             apr_array_header_t *arr = apr_array_make(r->pool, 0, sizeof(char*));
+            /* Split the forwarded-for list, keeping only entries that look
+               like an IP address and skipping (with a warning) anything else. */
             while (*fwdvalue && (val = ap_get_token(r->pool, &fwdvalue, 1))) {
-                *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, val);
+                char *ip = val;
+                apr_size_t len;
+                while (apr_isspace(*ip))
+                    ++ip;
+                len = strlen(ip);
+                while (len > 0 && apr_isspace(ip[len - 1]))
+                    ip[--len] = '\0';
+                if (rpaf_looks_like_ip(ip))
+                    *(char **)apr_array_push(arr) = apr_pstrdup(r->pool, ip);
+                else
+                    ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_WARNING, 0, r,
+                                  "mod_rpaf: X-Forwarded-For entry '%s' is not a valid IP, skipping", ip);
                 if (*fwdvalue != '\0')
                     ++fwdvalue;
             }
+
+            /* Pick the last forwarded address that is not one of our trusted
+               proxies; that is the real client behind a chain of proxies. If
+               there is nothing usable, leave the request untouched. */
+            last_val = last_not_in_array(arr, cfg->proxy_ips);
+            if (last_val == NULL)
+                return DECLINED;
+
+            rcr = (rpaf_cleanup_rec *)apr_pcalloc(r->pool, sizeof(rpaf_cleanup_rec));
             rcr->old_ip = apr_pstrdup(r->connection->pool, r->connection->remote_ip);
             rcr->old_family = r->connection->remote_addr->sa.sin.sin_family;
             rcr->r = r;
             apr_pool_cleanup_register(r->pool, (void *)rcr, rpaf_cleanup, apr_pool_cleanup_null);
-            r->connection->remote_ip = apr_pstrdup(r->connection->pool, ((char **)arr->elts)[((arr->nelts)-1)]);
+            r->connection->remote_ip = apr_pstrdup(r->connection->pool, last_val);
             r->connection->remote_addr->sa.sin.sin_addr.s_addr = apr_inet_addr(r->connection->remote_ip);
             r->connection->remote_addr->family = AF_INET;
             r->connection->remote_addr->sa.sin.sin_family = AF_INET;
@@ -213,8 +267,11 @@ static int change_remote_ip(request_rec *r) {
                 const char *portvalue;
                 if ((portvalue = apr_table_get(r->headers_in, "X-Forwarded-Port")) ||
                     (portvalue = apr_table_get(r->headers_in, "X-Port"))) {
-                    r->server->port    = atoi(portvalue);
-                    r->parsed_uri.port = r->server->port;
+                    /* Set the port for this request only. Mutating
+                       r->server->port corrupts the shared server_rec and
+                       leaks the port into other requests and vhosts. */
+                    r->parsed_uri.port     = atoi(portvalue);
+                    r->parsed_uri.port_str = apr_pstrcat(r->pool, ":", portvalue, NULL);
                 }
             }
         }

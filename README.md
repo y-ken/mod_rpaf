@@ -5,12 +5,20 @@
 Apache-2.2 module for reverse proxy forked from mod_rpaf-0.6. <br>
 Set `REMOTE_ADDR`, `HTTPS`, and `HTTP_PORT` from upstream proxy environment variables.
 
+This module targets Apache 2.2. On Apache 2.4 and later it is not needed —
+use the bundled [`mod_remoteip`](https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html)
+instead.
+
 ### What is the difference from original mod_rpaf-0.6.
 
 * Feature: Add directive RPAFsethttps. It's compatible with AWS ELB.
 * Feature: Add directive RPAFsetport.
 * Feature: Support for partial IP address as '192.168.' for RPAFproxy_ips.
 * Bugfix: In the case of APR_HAVE_IPV6-enabled build, access control of Order/Allow/Deny does not work correctly.
+* Bugfix: `RPAFsethttps` now also sets the SSL flag used by `RewriteCond %{HTTPS}`, not only `%{ENV:HTTPS}` (ported from gnif/mod_rpaf#6).
+* Bugfix: Behind a chain of proxies the real client IP (the last forwarded entry that is not a trusted proxy) is now used, instead of always taking the last entry.
+* Bugfix: Invalid `X-Forwarded-For` entries are validated and skipped instead of being trusted blindly.
+* Bugfix: `RPAFsetport` no longer mutates the shared server_rec, so it is safe to use with multiple virtualhosts.
 * Support of httpd 1.3 was deleted.
 
 ### Install with rpm package for RedHat/CentOS 6.x
@@ -61,9 +69,10 @@ RPAFsetport     (On|Off)           - Set the server port to the header value
                                      contained in X-Port, or X-Forwarded-Port.
 ````
 
-**Note:** The option of `RPAFsetport` has limitation. It only work for one virtualhost on localhost:80, and you only send requests like
-X-Forwarded-Port: 443.  
-Do not use this option for the regular multi domain hosted server due to current Apache architecture.
+**Note:** `RPAFsetport` now applies the forwarded port per request (via
+`r->parsed_uri.port`) instead of mutating the shared server configuration, so
+the previous limitation of working with only a single virtualhost no longer
+applies.
 
 ## Example Configuration
 
@@ -76,6 +85,24 @@ RPAFsetHostname  Off
 RPAFsethttps     Off
 RPAFsetport      Off
 ````
+
+## Testing
+
+This module targets the Apache 2.2 API, so the tests build and run it inside a
+CentOS 6 container (which ships Apache 2.2). With Docker available you can run
+the same suite that CI runs:
+
+````
+docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work \
+  centos:6 bash test/run-ci.sh
+````
+
+It builds the module, starts Apache, and checks `X-Forwarded-For` access
+control, real-client resolution behind a chain of proxies, and
+`RewriteCond %{HTTPS}` handling. The same command runs automatically on push to
+`master` and on pull requests via GitHub Actions (`.github/workflows/ci.yml`).
+A VS Code Dev Container (`.devcontainer/`) is also provided for editing with the
+build/test toolchain one command away.
 
 ## Authors
 
@@ -98,5 +125,8 @@ It is forked following projects.
 
 ## Appendix
 
-Patch is available for Apache 2.4+
+For Apache 2.4 and later, use the bundled `mod_remoteip` instead of this module.
+
+An old community patch for building this module on Apache 2.4+ also exists
+(unsupported here):
 http://blog.77jp.net/mod_rpaf-install-apache-2-4

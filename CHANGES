@@ -1,3 +1,12 @@
+Ported bug fixes from gnif/mod_rpaf:
+ - Behind a chain of proxies, use the last forwarded entry that is not a
+   trusted proxy as the client IP, instead of always taking the last entry.
+ - Validate X-Forwarded-For entries and skip anything that does not look
+   like an IP address (logged as a warning).
+ - RPAFsetport sets the port per request via r->parsed_uri.port instead of
+   mutating the shared server_rec, which previously leaked the port across
+   requests and virtualhosts.
+
 Keep Alive Problem reported and patched by Christian Schneider
  Also reported by Hiroyuki OYAMA and Vladimir Klebanov
 mod_rpaf was incorrectly using r->pool to allocate memory for the
