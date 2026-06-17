@@ -68,6 +68,10 @@ docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work \
   ubuntu:22.04 bash packaging/build-deb.sh
 ````
 
+Pushing a version tag (`v*`) builds all three packages and publishes them to
+the `gh-pages` branch automatically (`.github/workflows/release.yml`), so the
+install URLs above always serve the latest tagged release.
+
 ### Compile and Install for RedHat/CentOS
 
 ````

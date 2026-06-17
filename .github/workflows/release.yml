@@ -1,0 +1,65 @@
+name: Release packages
+
+# On a version tag push, build the RPMs and the .deb and publish them to the
+# gh-pages branch so they are installable by URL (see README). Can also be run
+# manually (workflow_dispatch) to re-publish the current default-branch build.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Build and publish packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source (tagged commit)
+        uses: actions/checkout@v5
+
+      - name: Checkout gh-pages
+        uses: actions/checkout@v5
+        with:
+          ref: gh-pages
+          path: gh-pages
+
+      - name: Build packages (el6, el7, ubuntu)
+        run: |
+          for img in centos:6 centos:7; do
+            docker run --rm --platform linux/amd64 \
+              -v "${{ github.workspace }}":/work -w /work \
+              "$img" bash packaging/build-rpm.sh
+          done
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}":/work -w /work \
+            ubuntu:22.04 bash packaging/build-deb.sh
+          ls -l dist/
+
+      - name: Publish to gh-pages
+        run: |
+          set -eux
+          mkdir -p gh-pages/centos/6/x86_64 gh-pages/centos/7/x86_64 gh-pages/ubuntu
+          # Publish the main packages only (skip the -debuginfo RPMs).
+          find dist -name '*.el6.x86_64.rpm' ! -name '*debuginfo*' \
+            -exec cp -v {} gh-pages/centos/6/x86_64/ \;
+          find dist -name '*.el7.x86_64.rpm' ! -name '*debuginfo*' \
+            -exec cp -v {} gh-pages/centos/7/x86_64/ \;
+          cp -v dist/*.deb gh-pages/ubuntu/
+          touch gh-pages/.nojekyll
+          bash packaging/gen-index.sh gh-pages
+
+          cd gh-pages
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No package changes to publish."
+          else
+            git commit -m "Publish packages for ${GITHUB_REF_NAME}"
+            git push
+          fi
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
