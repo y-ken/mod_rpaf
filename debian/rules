@@ -1,0 +1,17 @@
+#!/usr/bin/make -f
+# Build the Apache module with apxs2 (Debian/Ubuntu) and let dh_apache2 handle
+# enabling the module via a2enmod in the maintainer scripts.
+
+%:
+	dh $@ --with apache2
+
+override_dh_auto_build:
+	apxs2 -c -n mod_rpaf-2.0.so mod_rpaf-2.0.c
+
+override_dh_auto_install:
+	install -D -m 644 .libs/mod_rpaf-2.0.so \
+	  debian/libapache2-mod-rpaf-fork/usr/lib/apache2/modules/mod_rpaf-2.0.so
+
+override_dh_auto_clean:
+	rm -f *.o *.lo *.la *.slo *.loT
+	rm -rf .libs

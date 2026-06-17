@@ -1,7 +1,7 @@
 Summary:        Reverse Proxy Add Forward module for Apache
 Name:           mod_rpaf-fork
-Version:        0.6
-Release:        5%{?dist}
+Version:        0.7
+Release:        1%{?dist}
 
 Group:          System Environment/Daemons
 License:        Apache Software License
@@ -24,7 +24,8 @@ with mod_proxy that is distributed with Apache2 from version 2.0.38.
 
 
 %build
-/usr/sbin/apxs -Wc,"%{optflags}" -c -n mod_rpaf-2.0.so mod_rpaf-2.0.c
+# Resolve apxs from PATH: it lives in /usr/sbin on EL6 and /usr/bin on EL7.
+apxs -Wc,"%{optflags}" -c -n mod_rpaf-2.0.so mod_rpaf-2.0.c
 
 
 %install
@@ -46,7 +47,17 @@ rm -rf %{buildroot}
 
 
 %changelog
+* Wed Jun 17 2026 Kentaro Yoshida <y.ken.studio@gmail.com> - 0.7-1
+- Build and run on Apache 2.4 (CentOS 7) as well as Apache 2.2 (CentOS 6);
+  the client-address API is selected at compile time (closes #3).
+- Use the last non-trusted X-Forwarded-For entry as the client IP behind a
+  chain of proxies; validate and skip invalid entries (ported from gnif).
+- RPAFsetport applies the port per request instead of mutating server_rec.
+- RPAFsethttps no longer leaks the https scheme into later plain-HTTP
+  requests, sets the SSL flag used by RewriteCond %{HTTPS}, and validates the
+  forwarded HTTPS header value.
+- RPAFsethostname uses the last entry of a comma-separated X-Forwarded-Host.
 * Sun Aug 19 2012 Kentaro Yoshida <y.ken.studio@gmail.com>
 - Improbe forward compatibility
-* Sat Mar 13 2010 Scott R. Shinn <scott@atomicrocketturtle.com> 
+* Sat Mar 13 2010 Scott R. Shinn <scott@atomicrocketturtle.com>
 - Initial import to Atomic

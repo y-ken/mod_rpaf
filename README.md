@@ -28,10 +28,44 @@ such as `RPAFsetport` and partial-IP `RPAFproxy_ips`.
 * Feature: Builds and runs on Apache 2.4 (e.g. CentOS 7) as well as Apache 2.2, selecting the client-address API at compile time (closes #3).
 * Support of httpd 1.3 was deleted.
 
-### Install with rpm package for RedHat/CentOS 6.x
+### Install the prebuilt RPM (RedHat/CentOS 6 and 7)
+
+Prebuilt RPMs are published on GitHub Pages for both CentOS 6 (Apache 2.2,
+`.el6`) and CentOS 7 (Apache 2.4, `.el7`). Install directly from the URL:
 
 ````
-yum localinstall http://y-ken.github.io/package/centos/6/x86_64/mod_rpaf-fork-0.6-5.el6.x86_64.rpm
+# CentOS 6 (Apache 2.2)
+yum localinstall http://y-ken.github.io/mod_rpaf/centos/6/x86_64/mod_rpaf-fork-0.7-1.el6.x86_64.rpm
+
+# CentOS 7 (Apache 2.4)
+yum localinstall http://y-ken.github.io/mod_rpaf/centos/7/x86_64/mod_rpaf-fork-0.7-1.el7.x86_64.rpm
+````
+
+### Install the prebuilt .deb (Debian/Ubuntu)
+
+````
+wget http://y-ken.github.io/mod_rpaf/ubuntu/libapache2-mod-rpaf-fork_0.7-1_amd64.deb
+sudo apt install ./libapache2-mod-rpaf-fork_0.7-1_amd64.deb
+````
+
+The package installs the module and enables it (`a2enmod rpaf`); edit
+`/etc/apache2/mods-available/rpaf.conf` for your proxy and reload Apache.
+
+### Build the packages yourself with Docker
+
+The same scripts CI runs build each package inside the matching container; the
+artifacts land in `dist/`:
+
+````
+# RPMs (.el6 / .el7)
+docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work \
+  centos:6 bash packaging/build-rpm.sh
+docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work \
+  centos:7 bash packaging/build-rpm.sh
+
+# Debian/Ubuntu .deb
+docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work \
+  ubuntu:22.04 bash packaging/build-deb.sh
 ````
 
 ### Compile and Install for RedHat/CentOS
@@ -47,14 +81,6 @@ or simply try:
 yum install httpd-devel
 make
 make install
-````
-
-### Compile Debian/Ubuntu Package and Install
-
-````
-sudo apt-get install build-essential apache2-threaded-dev yada
-dpkg-buildpackage -b
-sudo dpkg -i ../libapache2-mod-rpaf_X.X-X.X_XXX.deb
 ````
 
 ### Configuration Directives

@@ -1,0 +1,18 @@
+Source: mod-rpaf-fork
+Section: httpd
+Priority: optional
+Maintainer: Kentaro YOSHIDA <y.ken.studio@gmail.com>
+Build-Depends: debhelper-compat (= 13), apache2-dev, dh-apache2
+Standards-Version: 4.6.0
+Homepage: https://github.com/y-ken/mod_rpaf
+
+Package: libapache2-mod-rpaf-fork
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, apache2
+Description: reverse proxy add forward module for Apache (fork)
+ mod_rpaf-fork sets REMOTE_ADDR, HTTPS and HTTP_PORT from the headers a reverse
+ proxy adds (X-Forwarded-For, X-Forwarded-Proto, X-Forwarded-Port), so backend
+ Apache sees the real client instead of the proxy.
+ .
+ This fork builds and runs on both Apache 2.2 and Apache 2.4 and adds
+ RPAFsetport, partial-IP RPAFproxy_ips and several proxy-handling fixes.

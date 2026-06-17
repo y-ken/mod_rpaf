@@ -1,0 +1,11 @@
+mod-rpaf-fork (0.7-1) unstable; urgency=medium
+
+  * Build and run on both Apache 2.2 and Apache 2.4.
+  * Use the real client IP behind a chain of proxies, validate and skip
+    invalid X-Forwarded-For entries.
+  * RPAFsetport applies the port per request instead of mutating server_rec.
+  * RPAFsethttps no longer leaks the https scheme, sets the SSL flag used by
+    RewriteCond %{HTTPS}, and validates the forwarded HTTPS header value.
+  * RPAFsethostname uses the last entry of a comma-separated X-Forwarded-Host.
+
+ -- Kentaro YOSHIDA <y.ken.studio@gmail.com>  Wed, 17 Jun 2026 00:00:00 +0900

@@ -8,3 +8,6 @@
 *.so
 .libs/
 *~
+
+# RPM build output (packaging/build-rpm.sh)
+dist/

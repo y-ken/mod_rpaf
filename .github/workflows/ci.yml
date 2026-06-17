@@ -40,3 +40,39 @@ jobs:
           docker run --rm --platform linux/amd64 \
             -v "${{ github.workspace }}":/work -w /work \
             ${{ matrix.image }} bash test/run-ci.sh
+
+  package:
+    name: Build package (${{ matrix.label }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: centos:6
+            script: packaging/build-rpm.sh
+            label: el6
+          - image: centos:7
+            script: packaging/build-rpm.sh
+            label: el7
+          - image: ubuntu:22.04
+            script: packaging/build-deb.sh
+            label: ubuntu
+    steps:
+      - uses: actions/checkout@v5
+
+      # Build the binary package inside the matching container so the package
+      # format, version suffix and linked Apache ABI are correct. Same docker
+      # pattern as the functional tests above: CentOS 6/7 produce .el6/.el7
+      # RPMs, Ubuntu produces the .deb.
+      - name: Build package
+        run: |
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}":/work -w /work \
+            ${{ matrix.image }} bash ${{ matrix.script }}
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mod_rpaf-fork-${{ matrix.label }}
+          path: dist/*
+          if-no-files-found: error
